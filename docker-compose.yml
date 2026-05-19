@@ -1,0 +1,74 @@
+# =============================================================================
+# docker-compose.yml — Communicating Agents Network Search AI
+# =============================================================================
+#
+# PURPOSE:
+#   Defines a multi-container deployment using Docker Compose.
+#   Runs the Flask app behind a Gunicorn WSGI server (production-grade).
+#   Optionally adds Nginx as a reverse proxy for real hosting.
+#
+# HOW TO USE:
+#   Option A — Development (Flask built-in server):
+#       python app.py
+#
+#   Option B — Production via Docker Compose:
+#       1. Install Docker Desktop (https://www.docker.com/products/docker-desktop)
+#       2. Open a terminal IN the project folder (where this file lives)
+#       3. Run:  docker compose up --build
+#       4. Open: http://localhost:5000   (or http://localhost if using nginx)
+#
+#   Stop:        docker compose down
+#   Rebuild:     docker compose up --build --force-recreate
+#
+# =============================================================================
+
+version: "3.9"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # SERVICE 1 — The Flask / Gunicorn Application Server
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .                  # Build from current directory (uses Dockerfile)
+      dockerfile: Dockerfile      # Dockerfile defined below (see comments)
+    container_name: agents-web
+    restart: unless-stopped       # Auto-restart on crash (reliability)
+    ports:
+      - "5000:5000"               # Map host port 5000 → container port 5000
+    environment:
+      - FLASK_ENV=production      # Disable Flask debug mode in production
+      - PYTHONUNBUFFERED=1        # Show Python logs immediately (no buffering)
+    volumes:
+      - .:/app                    # Mount project folder into container
+                                  # Allows code changes without rebuild (dev mode)
+    networks:
+      - agents-net
+
+  # ---------------------------------------------------------------------------
+  # SERVICE 2 — Nginx Reverse Proxy (optional but recommended for real hosting)
+  # ---------------------------------------------------------------------------
+  # Uncomment this block if deploying to a server with a domain name.
+  # Nginx handles HTTPS termination, static files, and load balancing.
+  #
+  # nginx:
+  #   image: nginx:1.25-alpine
+  #   container_name: agents-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+  #   depends_on:
+  #     - web
+  #   networks:
+  #     - agents-net
+
+# ---------------------------------------------------------------------------
+# NETWORK — Internal Docker bridge network for service-to-service communication
+# ---------------------------------------------------------------------------
+networks:
+  agents-net:
+    driver: bridge

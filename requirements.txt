@@ -1,0 +1,13 @@
+# =============================================================================
+# requirements.txt — Python Dependencies
+# =============================================================================
+# Install all dependencies with:
+#   pip install -r requirements.txt
+#
+# All packages listed here support Python 3.13 and 3.14.
+# =============================================================================
+
+flask>=3.0.0          # Web framework — routing, templates, HTTP handling
+flask-cors>=4.0.0     # Cross-Origin Resource Sharing (allows JS fetch calls)
+networkx>=3.3         # Graph data structure + shortest path algorithms (Dijkstra, BFS, DFS)
+gunicorn>=22.0.0      # Production WSGI server (replaces Flask dev server for deployment)
