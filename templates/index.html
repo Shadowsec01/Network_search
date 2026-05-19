@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Communicating Agents — Network Search AI</title>
+
+  <!-- Bootstrap 5.3 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <!-- vis.js Network — for interactive graph visualisation -->
+  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/dist/vis-network.min.css" rel="stylesheet" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ================================================================
+       GLOBAL DESIGN SYSTEM
+       White background, sharp navy + accent-teal palette, Sora + Mono
+    ================================================================ */
+    :root {
+      --navy      : #0d1b2a;
+      --navy-mid  : #1b2d45;
+      --teal      : #0cc6c6;
+      --teal-soft : #e0fafa;
+      --amber     : #f5a623;
+      --green     : #22c55e;
+      --red       : #ef4444;
+      --grey-100  : #f8f9fa;
+      --grey-200  : #e9ecef;
+      --grey-400  : #adb5bd;
+      --text      : #0d1b2a;
+      --card-shadow: 0 4px 24px rgba(13,27,42,.10);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family  : 'Sora', sans-serif;
+      background   : #ffffff;
+      color        : var(--text);
+      min-height   : 100vh;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      background : var(--navy);
+      color      : #fff;
+      padding    : 0.75rem 1.5rem;
+      display    : flex;
+      align-items: center;
+      gap        : 1rem;
+      position   : sticky;
+      top        : 0;
+      z-index    : 100;
+      box-shadow : 0 2px 12px rgba(0,0,0,.25);
+    }
+    .topbar .logo {
+      font-size  : 1.1rem;
+      font-weight: 700;
+      letter-spacing: .5px;
+      display    : flex;
+      align-items: center;
+      gap        : .5rem;
+    }
+    .topbar .logo span.dot {
+      width : 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--teal);
+      display: inline-block;
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0%,100%{ opacity:1; transform:scale(1); }
+      50%     { opacity:.5; transform:scale(1.4); }
+    }
+    .topbar .badge-uni {
+      background : var(--teal);
+      color      : var(--navy);
+      font-size  : .7rem;
+      font-weight: 700;
+      padding    : .2rem .6rem;
+      border-radius: 20px;
+    }
+
+    /* ── STUDENT IDENTITY CARD ── */
+    .student-card {
+      background   : linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+      color        : #fff;
+      padding      : 1.25rem 1.5rem;
+      border-bottom: 3px solid var(--teal);
+    }
+    .student-card .field-label {
+      font-size  : .65rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color      : var(--teal);
+      font-weight: 600;
+    }
+    .student-card .field-value {
+      font-size  : .95rem;
+      font-weight: 600;
+      margin-top : .1rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .student-card .divider-v {
+      border-left: 1px solid rgba(255,255,255,.2);
+      margin     : 0 1rem;
+      height     : 40px;
+    }
+
+    /* ── SECTION HEADINGS ── */
+    .section-heading {
+      font-size  : .7rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color      : var(--teal);
+      margin-bottom: .75rem;
+    }
+
+    /* ── PANEL CARD ── */
+    .panel-card {
+      background   : #fff;
+      border       : 1px solid var(--grey-200);
+      border-radius: 12px;
+      box-shadow   : var(--card-shadow);
+      overflow     : hidden;
+    }
+    .panel-card .panel-header {
+      background   : var(--navy);
+      color        : #fff;
+      padding      : .7rem 1.1rem;
+      font-size    : .8rem;
+      font-weight  : 700;
+      letter-spacing: .5px;
+      display      : flex;
+      align-items  : center;
+      gap          : .5rem;
+    }
+    .panel-card .panel-body { padding: 1rem; }
+
+    /* ── GRAPH CANVAS ── */
+    #network-canvas {
+      width : 100%;
+      height: 420px;
+      border-radius: 0;
+    }
+    @media (min-width: 992px) {
+      #network-canvas { height: 520px; }
+    }
+
+    /* ── CONTROLS ── */
+    .form-select, .form-control {
+      border-radius: 8px;
+      border       : 1.5px solid var(--grey-200);
+      font-family  : 'Sora', sans-serif;
+      font-size    : .85rem;
+    }
+    .form-select:focus, .form-control:focus {
+      border-color: var(--teal);
+      box-shadow  : 0 0 0 3px rgba(12,198,198,.15);
+    }
+    .btn-run {
+      background   : var(--navy);
+      color        : #fff;
+      border       : none;
+      border-radius: 8px;
+      font-weight  : 700;
+      letter-spacing: .5px;
+      padding      : .55rem 1.4rem;
+      transition   : background .2s, transform .1s;
+      display      : flex;
+      align-items  : center;
+      gap          : .4rem;
+    }
+    .btn-run:hover  { background: var(--teal); color: var(--navy); }
+    .btn-run:active { transform: scale(.97); }
+    .btn-run:disabled { opacity:.5; cursor:not-allowed; }
+
+    /* ── NODE LEGEND ── */
+    .legend-dot {
+      width:12px; height:12px; border-radius:50%; display:inline-block;
+    }
+
+    /* ── AGENT STATUS BADGES ── */
+    .agent-badge {
+      font-family : 'JetBrains Mono', monospace;
+      font-size   : .72rem;
+      padding     : .25rem .65rem;
+      border-radius: 6px;
+      display     : inline-flex;
+      align-items : center;
+      gap         : .3rem;
+      font-weight : 700;
+    }
+    .badge-bfs    { background:#dbeafe; color:#1d4ed8; }
+    .badge-dfs    { background:#fce7f3; color:#be185d; }
+    .badge-greedy { background:#fef3c7; color:#b45309; }
+    .badge-idle   { background:var(--grey-200); color:var(--grey-400); }
+    .badge-found  { background:#dcfce7; color:#15803d; }
+
+    /* ── STEPS TABLE ── */
+    .steps-table-wrap {
+      max-height : 280px;
+      overflow-y : auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size  : .72rem;
+    }
+    .steps-table-wrap::-webkit-scrollbar { width:4px; }
+    .steps-table-wrap::-webkit-scrollbar-thumb { background:var(--grey-200); border-radius:4px; }
+
+    .steps-table td, .steps-table th {
+      padding    : .3rem .6rem;
+      white-space: nowrap;
+    }
+    .steps-table th { background: var(--grey-100); font-size:.65rem; letter-spacing:1px; }
+
+    .action-VISIT     { color:#1d4ed8; }
+    .action-FOUND     { color:var(--green); font-weight:700; }
+    .action-BACKTRACK { color:var(--amber); }
+    .action-ENQUEUE, .action-PUSH { color:var(--grey-400); }
+    .action-START     { color:var(--navy); font-weight:700; }
+    .action-EXHAUSTED { color:var(--red); }
+
+    /* ── COMPARISON TABLE ── */
+    .compare-table th { background:var(--navy); color:#fff; font-size:.72rem; }
+    .compare-table td { font-size:.8rem; }
+    .rank-1 { background:#f0fdf4; font-weight:700; }
+    .rank-2 { background:#fefce8; }
+    .rank-3 { background:#fff7ed; }
+
+    /* ── BLACKBOARD MESSAGES ── */
+    .msg-log {
+      max-height  : 200px;
+      overflow-y  : auto;
+      font-family : 'JetBrains Mono', monospace;
+      font-size   : .68rem;
+      background  : var(--navy);
+      color       : #a5f3fc;
+      padding     : .75rem;
+      border-radius: 8px;
+    }
+    .msg-log .msg-row { margin-bottom:.2rem; }
+    .msg-log .ms-sender { color:var(--teal); }
+    .msg-log .ms-type   { color:var(--amber); }
+    .msg-log .ms-found  { color:var(--green); font-weight:700; }
+
+    /* ── NODE INFO POPOVER ── */
+    #node-info-card {
+      background   : var(--grey-100);
+      border       : 1.5px solid var(--teal);
+      border-radius: 10px;
+      padding      : 1rem;
+      font-size    : .8rem;
+      display      : none;
+    }
+    #node-info-card .node-ip {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color      : var(--navy);
+    }
+
+    /* ── SPINNER ── */
+    .spinner-wrap {
+      display   : none;
+      text-align: center;
+      padding   : 1rem;
+    }
+    .spinner-wrap.active { display:block; }
+
+    /* ── PATH HIGHLIGHT STRIP ── */
+    .path-strip {
+      font-family  : 'JetBrains Mono', monospace;
+      font-size    : .78rem;
+      background   : var(--teal-soft);
+      border-left  : 4px solid var(--teal);
+      padding      : .5rem .8rem;
+      border-radius: 0 8px 8px 0;
+      margin-top   : .4rem;
+    }
+    .path-strip .arrow { color:var(--teal); font-weight:700; }
+
+    /* ── RESPONSIVE TWEAKS ── */
+    @media (max-width: 576px) {
+      .student-card .divider-v { display:none; }
+      .student-card .row.g-3 > div { margin-bottom:.5rem; }
+      .topbar .logo { font-size:.9rem; }
+    }
+
+    /* ── ABOUT SECTION (Theory explanation) ── */
+    .theory-card {
+      border-left: 4px solid var(--teal);
+      padding    : .75rem 1rem;
+      background : var(--grey-100);
+      border-radius: 0 8px 8px 0;
+      margin-bottom: .75rem;
+    }
+    .theory-card h6 {
+      font-weight : 700;
+      font-size   : .82rem;
+      color       : var(--navy);
+      margin-bottom: .25rem;
+    }
+    .theory-card p { font-size:.78rem; color:#495057; margin:0; }
+
+    /* ── TABS ── */
+    .nav-tabs .nav-link {
+      font-size  : .78rem;
+      font-weight: 600;
+      color      : var(--grey-400);
+      border     : none;
+      padding    : .5rem .9rem;
+    }
+    .nav-tabs .nav-link.active {
+      color        : var(--navy);
+      border-bottom: 2.5px solid var(--teal);
+      background   : transparent;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      background  : var(--navy);
+      color       : rgba(255,255,255,.5);
+      text-align  : center;
+      font-size   : .72rem;
+      padding     : 1rem;
+      margin-top  : 2rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ========================================================= TOPBAR -->
+  <div class="topbar">
+    <div class="logo">
+      <span class="dot"></span>
+      Communicating Agents — Network Search AI
+    </div>
+    <span class="badge-uni ms-auto">Expert AI Training System</span>
+  </div>
+
+  <!-- ========================================================= STUDENT IDENTITY CARD -->
+  <div class="student-card">
+    <div class="container-fluid">
+      <div class="row align-items-center g-2">
+        <div class="col-auto">
+          <div class="field-label">Student Full Name</div>
+          <div class="field-value" id="sid-name">ENTER YOUR NAME BELOW</div>
+        </div>
+        <div class="col-auto d-none d-sm-block"><div class="divider-v"></div></div>
+        <div class="col-auto">
+          <div class="field-label">Registration No.</div>
+          <div class="field-value" id="sid-reg">—</div>
+        </div>
+        <div class="col-auto d-none d-sm-block"><div class="divider-v"></div></div>
+        <div class="col-auto">
+          <div class="field-label">Department</div>
+          <div class="field-value" id="sid-dept">—</div>
+        </div>
+        <div class="col-auto ms-auto">
+          <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#studentModal">
+            <i class="bi bi-pencil-square"></i> Edit Profile
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= MAIN LAYOUT -->
+  <div class="container-fluid py-3 px-3 px-md-4">
+    <div class="row g-3">
+
+      <!-- ════════════════════════ LEFT COLUMN — Graph + Controls -->
+      <div class="col-12 col-lg-7">
+
+        <!-- Graph Panel -->
+        <div class="panel-card mb-3">
+          <div class="panel-header">
+            <i class="bi bi-diagram-3-fill"></i> Live Network Topology
+            <span class="ms-auto badge bg-teal text-navy" style="background:var(--teal);color:var(--navy);font-size:.65rem;">
+              vis.js Interactive
+            </span>
+          </div>
+          <div id="network-canvas"></div>
+          <!-- Legend -->
+          <div class="panel-body border-top" style="background:var(--grey-100);">
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+              <span class="section-heading mb-0">LEGEND</span>
+              <span><span class="legend-dot me-1" style="background:#1e40af"></span><small>Router</small></span>
+              <span><span class="legend-dot me-1" style="background:#15803d"></span><small>Server</small></span>
+              <span><span class="legend-dot me-1" style="background:#6b7280"></span><small>Workstation</small></span>
+              <span><span class="legend-dot me-1" style="background:#ef4444"></span><small>Offline</small></span>
+              <span class="ms-auto text-muted" style="font-size:.7rem;font-family:'JetBrains Mono',monospace;">
+                Click any node for details
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Node Info -->
+        <div id="node-info-card" class="mb-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-hdd-network-fill text-primary"></i>
+            <strong id="ni-id">—</strong>
+            <span id="ni-type" class="badge bg-secondary"></span>
+            <span id="ni-status" class="ms-auto"></span>
+          </div>
+          <div class="node-ip mb-1" id="ni-ip">—</div>
+          <div class="row g-2 mt-1">
+            <div class="col-6">
+              <div style="font-size:.68rem;color:#888;">OS</div>
+              <div id="ni-os" style="font-size:.78rem;font-weight:600;">—</div>
+            </div>
+            <div class="col-6">
+              <div style="font-size:.68rem;color:#888;">Services</div>
+              <div id="ni-services" style="font-size:.78rem;font-weight:600;">—</div>
+            </div>
+            <div class="col-12">
+              <div style="font-size:.68rem;color:#888;">Open Ports</div>
+              <div id="ni-ports" style="font-size:.78rem;font-family:'JetBrains Mono',monospace;">—</div>
+            </div>
+            <div class="col-12">
+              <div style="font-size:.68rem;color:#888;">Neighbours</div>
+              <div id="ni-nbrs" style="font-size:.78rem;font-family:'JetBrains Mono',monospace;">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Controls -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <i class="bi bi-search"></i> Agent Search Controls
+          </div>
+          <div class="panel-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-sm-4">
+                <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;">
+                  <i class="bi bi-geo-alt-fill text-primary"></i> Source Node
+                </label>
+                <select class="form-select form-select-sm" id="sel-start">
+                  <option value="">Loading nodes…</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-4">
+                <label class="form-label mb-1" style="font-size:.75rem;font-weight:600;">
+                  <i class="bi bi-flag-fill text-danger"></i> Target Node
+                </label>
+                <select class="form-select form-select-sm" id="sel-target">
+                  <option value="">Loading nodes…</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-4">
+                <button class="btn-run w-100" id="btn-run" onclick="runSearch()">
+                  <i class="bi bi-play-circle-fill"></i> Launch Agents
+                </button>
+              </div>
+            </div>
+            <div id="search-error" class="alert alert-danger alert-sm mt-2 py-1 px-2 d-none" style="font-size:.78rem;"></div>
+          </div>
+        </div>
+
+      </div><!-- /LEFT COLUMN -->
+
+
+      <!-- ════════════════════════ RIGHT COLUMN — Results + Theory -->
+      <div class="col-12 col-lg-5">
+
+        <!-- Agent Status Row -->
+        <div class="panel-card mb-3">
+          <div class="panel-header"><i class="bi bi-cpu-fill"></i> Agent Status</div>
+          <div class="panel-body">
+            <div class="d-flex flex-wrap gap-2">
+              <span class="agent-badge badge-idle" id="badge-bfs"><i class="bi bi-circle"></i> BFS-Agent · IDLE</span>
+              <span class="agent-badge badge-idle" id="badge-dfs"><i class="bi bi-circle"></i> DFS-Agent · IDLE</span>
+              <span class="agent-badge badge-idle" id="badge-greedy"><i class="bi bi-circle"></i> Greedy-Agent · IDLE</span>
+            </div>
+            <div class="spinner-wrap mt-2" id="spinner">
+              <div class="d-flex align-items-center gap-2 justify-content-center">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                <span style="font-size:.78rem;">Agents searching…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Tabs -->
+        <div class="panel-card mb-3">
+          <div class="panel-header"><i class="bi bi-bar-chart-steps"></i> Search Results</div>
+          <div class="panel-body p-0">
+            <ul class="nav nav-tabs px-3 pt-2" id="resultTabs">
+              <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-compare">Comparison</a></li>
+              <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-bfs">BFS Steps</a></li>
+              <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-dfs">DFS Steps</a></li>
+              <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-greedy">Greedy Steps</a></li>
+            </ul>
+
+            <div class="tab-content p-3">
+
+              <!-- ── COMPARE TAB ── -->
+              <div class="tab-pane fade show active" id="tab-compare">
+                <div id="no-results" class="text-muted text-center py-3" style="font-size:.8rem;">
+                  <i class="bi bi-arrow-left-circle"></i> Select nodes and launch agents to see results
+                </div>
+                <div id="compare-wrap" class="d-none">
+                  <div class="mb-2" id="best-agent-banner"></div>
+                  <div class="table-responsive">
+                    <table class="table table-bordered compare-table mb-0">
+                      <thead>
+                        <tr>
+                          <th>Rank</th><th>Agent</th><th>Strategy</th>
+                          <th>Found?</th><th>Hops</th><th>Steps</th><th>Msgs</th>
+                        </tr>
+                      </thead>
+                      <tbody id="compare-body"></tbody>
+                    </table>
+                  </div>
+                  <div id="paths-section" class="mt-3"></div>
+                </div>
+              </div>
+
+              <!-- ── BFS STEPS TAB ── -->
+              <div class="tab-pane fade" id="tab-bfs">
+                <div id="bfs-steps-wrap" class="steps-table-wrap">
+                  <div class="text-muted text-center py-3" style="font-size:.78rem;">No data yet</div>
+                </div>
+              </div>
+
+              <!-- ── DFS STEPS TAB ── -->
+              <div class="tab-pane fade" id="tab-dfs">
+                <div id="dfs-steps-wrap" class="steps-table-wrap">
+                  <div class="text-muted text-center py-3" style="font-size:.78rem;">No data yet</div>
+                </div>
+              </div>
+
+              <!-- ── GREEDY STEPS TAB ── -->
+              <div class="tab-pane fade" id="tab-greedy">
+                <div id="greedy-steps-wrap" class="steps-table-wrap">
+                  <div class="text-muted text-center py-3" style="font-size:.78rem;">No data yet</div>
+                </div>
+              </div>
+
+            </div><!-- /tab-content -->
+          </div>
+        </div>
+
+        <!-- Blackboard Message Log -->
+        <div class="panel-card mb-3">
+          <div class="panel-header">
+            <i class="bi bi-chat-square-text-fill"></i> Blackboard Communication Log
+            <span class="ms-auto" id="msg-count-badge" style="font-size:.65rem;background:var(--teal);color:var(--navy);padding:.1rem .5rem;border-radius:20px;">0 msgs</span>
+          </div>
+          <div class="panel-body">
+            <div class="msg-log" id="msg-log">
+              <span class="text-muted">&gt; Awaiting agent communication…</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Theory Section -->
+        <div class="panel-card">
+          <div class="panel-header"><i class="bi bi-book-fill"></i> AI Theory Reference</div>
+          <div class="panel-body">
+
+            <div class="theory-card">
+              <h6><i class="bi bi-grid-3x3-gap-fill me-1" style="color:var(--teal)"></i>Blackboard Architecture</h6>
+              <p>A shared memory space all agents read/write. Decouples agents — they never call each other directly. 
+                 Used in NASA mission planning, air traffic control, and network management systems.</p>
+            </div>
+
+            <div class="theory-card">
+              <h6><i class="bi bi-arrow-repeat me-1" style="color:#1d4ed8"></i>BFS — Uninformed Search</h6>
+              <p>Explores nodes level-by-level using a FIFO queue. <strong>Guarantees shortest path</strong> 
+                 (fewest hops). Time/Space: O(V+E). Real use: peer-to-peer network search, LinkedIn connections.</p>
+            </div>
+
+            <div class="theory-card">
+              <h6><i class="bi bi-arrow-down-circle me-1" style="color:#be185d"></i>DFS — Uninformed Search</h6>
+              <p>Dives deep using a LIFO stack. Memory efficient (stores only current branch). 
+                 <strong>Does not guarantee shortest path.</strong> Real use: web crawlers, dependency resolution, network vulnerability scanners.</p>
+            </div>
+
+            <div class="theory-card">
+              <h6><i class="bi bi-lightning-charge-fill me-1" style="color:var(--amber)"></i>Greedy — Informed Heuristic Search</h6>
+              <p>Always picks the cheapest edge (lowest ms latency) using a min-heap priority queue. 
+                 Makes locally optimal choices. <strong>Does not guarantee global optimum.</strong> 
+                 Real use: OSPF routing protocol, GPS navigation.</p>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /RIGHT COLUMN -->
+    </div><!-- /row -->
+  </div><!-- /container -->
+
+  <footer>
+    Communicating Agents — Network Search AI &nbsp;|&nbsp; Expert AI Training System &nbsp;|&nbsp;
+    Flask + NetworkX + vis.js &nbsp;|&nbsp; Python 3.13+ Compatible
+  </footer>
+
+
+  <!-- ========================================================= STUDENT MODAL -->
+  <div class="modal fade" id="studentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header" style="background:var(--navy);color:#fff;">
+          <h5 class="modal-title" style="font-size:.9rem;font-weight:700;">
+            <i class="bi bi-person-badge-fill me-2"></i>Student Identity — Project Cover Page
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size:.82rem;">Full Name</label>
+            <input type="text" class="form-control form-control-sm" id="inp-name"
+              placeholder="e.g. Chukwuemeka Obi Ifeanyi" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size:.82rem;">Registration Number</label>
+            <input type="text" class="form-control form-control-sm" id="inp-reg"
+              placeholder="e.g. CSC/2021/001" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size:.82rem;">Department</label>
+            <input type="text" class="form-control form-control-sm" id="inp-dept"
+              placeholder="e.g. Computer Science" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" style="font-size:.82rem;">Project Title</label>
+            <input type="text" class="form-control form-control-sm" id="inp-title"
+              value="Communicating Agents for Searching Networks" readonly
+              style="background:var(--grey-100);" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-primary" onclick="saveStudentInfo()" data-bs-dismiss="modal"
+            style="background:var(--navy);border:none;">Save Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    /* ================================================================
+       FRONTEND JAVASCRIPT
+       Responsibilities:
+         1. Load graph data from /api/graph → render vis.js network
+         2. Load node list from /api/nodes  → populate dropdowns
+         3. POST to /api/search            → run agents, render results
+         4. Node click                     → fetch /api/node/:id for details
+         5. Student profile management     → localStorage persistence
+    ================================================================ */
+
+    const API = "";   // Base URL (empty = same origin as Flask server)
+
+    // ── 1. LOAD STUDENT PROFILE FROM LOCALSTORAGE ──────────────────
+    // We use localStorage here purely for UI convenience (student name).
+    // This is separate from the Blackboard which lives in Python memory.
+    function loadStudentProfile() {
+      const profile = JSON.parse(localStorage.getItem("studentProfile") || "{}");
+      document.getElementById("sid-name").textContent = profile.name  || "THOMPSON NWADIUTO BLESSING";
+      document.getElementById("sid-reg" ).textContent = profile.reg   || "20231366332";
+      document.getElementById("sid-dept").textContent = profile.dept  || "CYBERSECURITY";
+      if (profile.name) document.getElementById("inp-name").value = profile.name;
+      if (profile.reg)  document.getElementById("inp-reg" ).value = profile.reg;
+      if (profile.dept) document.getElementById("inp-dept").value = profile.dept;
+    }
+
+    function saveStudentInfo() {
+      const profile = {
+        name : document.getElementById("inp-name").value.trim(),
+        reg  : document.getElementById("inp-reg" ).value.trim(),
+        dept : document.getElementById("inp-dept").value.trim()
+      };
+      localStorage.setItem("studentProfile", JSON.stringify(profile));
+      loadStudentProfile();
+    }
+
+    // ── 2. VIS.JS GRAPH SETUP ──────────────────────────────────────
+    let network = null;   // vis.js Network instance (global for highlighting)
+
+    /*
+     * vis.js Groups — map our node types to visual styles.
+     * Each group defines: color, shape, font.
+     * This gives instant visual parsing of the network topology.
+     */
+    const VIS_OPTIONS = {
+      nodes: {
+        shape      : "dot",
+        size       : 18,
+        font       : { face: "Sora", size: 12, color: "#0d1b2a" },
+        borderWidth: 2,
+      },
+      edges: {
+        width  : 1.5,
+        color  : { color: "#cbd5e1", highlight: "#0cc6c6" },
+        font   : { face: "JetBrains Mono", size: 9, color: "#64748b" },
+        smooth : { type: "continuous" },
+      },
+      groups: {
+        router      : { color: { background:"#1e40af", border:"#1e3a8a" }, font:{color:"#fff"} },
+        server      : { color: { background:"#15803d", border:"#166534" }, font:{color:"#fff"} },
+        workstation : { color: { background:"#6b7280", border:"#4b5563" }, font:{color:"#fff"} },
+        offline     : { color: { background:"#ef4444", border:"#b91c1c" }, font:{color:"#fff"} },
+      },
+      physics: {
+        solver     : "forceAtlas2Based",
+        stabilization: { iterations: 200 }
+      },
+      interaction: {
+        hover     : true,
+        tooltipDelay: 150
+      }
+    };
+
+    async function initGraph() {
+      /*
+       * Fetch graph JSON from Flask /api/graph endpoint.
+       * Convert to vis.js DataSet format and render.
+       */
+      try {
+        const res  = await fetch(`${API}/api/graph`);
+        const data = await res.json();
+
+        // Convert backend nodes to vis.js format
+        const visNodes = data.nodes.map(n => ({
+          id    : n.id,
+          label : n.id,
+          title : `${n.ip}\n${n.type}\n${n.status}`,  // Tooltip on hover
+          group : n.status === "offline" ? "offline" : n.type,
+        }));
+
+        const visEdges = data.edges.map((e, i) => ({
+          id    : i,
+          from  : e.from,
+          to    : e.to,
+          label : e.label,
+        }));
+
+        const container = document.getElementById("network-canvas");
+        network = new vis.Network(
+          container,
+          { nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges) },
+          VIS_OPTIONS
+        );
+
+        // Node click handler — show node detail panel
+        network.on("click", params => {
+          if (params.nodes.length > 0) {
+            fetchNodeDetail(params.nodes[0]);
+          }
+        });
+
+      } catch (err) {
+        console.error("Graph load failed:", err);
+      }
+    }
+
+    // ── 3. LOAD NODE DROPDOWNS ────────────────────────────────────
+    async function loadNodeDropdowns() {
+      try {
+        const res   = await fetch(`${API}/api/nodes`);
+        const nodes = await res.json();
+
+        const startSel  = document.getElementById("sel-start");
+        const targetSel = document.getElementById("sel-target");
+
+        startSel.innerHTML  = `<option value="">— Select source —</option>`;
+        targetSel.innerHTML = `<option value="">— Select target —</option>`;
+
+        nodes.forEach(n => {
+          const icon  = n.type === "router" ? "🔵" : n.type === "server" ? "🟢" : "⚪";
+          const label = `${icon} ${n.id} · ${n.ip} [${n.type}]`;
+          startSel .innerHTML += `<option value="${n.id}">${label}</option>`;
+          targetSel.innerHTML += `<option value="${n.id}">${label}</option>`;
+        });
+      } catch (err) {
+        console.error("Node list load failed:", err);
+      }
+    }
+
+    // ── 4. NODE DETAIL PANEL ──────────────────────────────────────
+    async function fetchNodeDetail(nodeId) {
+      try {
+        const res  = await fetch(`${API}/api/node/${nodeId}`);
+        const data = await res.json();
+        if (data.error) return;
+
+        document.getElementById("ni-id"      ).textContent = data.id;
+        document.getElementById("ni-type"    ).textContent = data.type;
+        document.getElementById("ni-ip"      ).textContent = data.ip;
+        document.getElementById("ni-os"      ).textContent = data.data.os || "—";
+        document.getElementById("ni-services").textContent = (data.data.services || []).join(", ");
+        document.getElementById("ni-ports"   ).textContent = (data.data.open_ports || []).join(", ");
+        document.getElementById("ni-nbrs"    ).textContent = data.neighbours.join("  →  ") || "None";
+
+        // Status badge
+        const statusEl = document.getElementById("ni-status");
+        statusEl.textContent = data.status.toUpperCase();
+        statusEl.className   = `badge ${data.status === "online" ? "bg-success" : "bg-danger"}`;
+
+        // Type badge
+        const typeEl = document.getElementById("ni-type");
+        typeEl.textContent = data.type;
+        typeEl.className   = `badge ${data.type === "router" ? "bg-primary" : data.type === "server" ? "bg-success" : "bg-secondary"}`;
+
+        document.getElementById("node-info-card").style.display = "block";
+      } catch (err) {
+        console.error("Node detail fetch failed:", err);
+      }
+    }
+
+    // ── 5. MAIN SEARCH FUNCTION ───────────────────────────────────
+    async function runSearch() {
+      const start  = document.getElementById("sel-start" ).value;
+      const target = document.getElementById("sel-target").value;
+      const errEl  = document.getElementById("search-error");
+
+      errEl.classList.add("d-none");
+
+      // Client-side validation
+      if (!start || !target) {
+        errEl.textContent = "Please select both a source and a target node.";
+        errEl.classList.remove("d-none");
+        return;
+      }
+      if (start === target) {
+        errEl.textContent = "Source and target must be different nodes.";
+        errEl.classList.remove("d-none");
+        return;
+      }
+
+      // UI: loading state
+      document.getElementById("btn-run" ).disabled = true;
+      document.getElementById("spinner" ).classList.add("active");
+      setAgentBadge("bfs",    "SEARCHING", "badge-bfs");
+      setAgentBadge("dfs",    "SEARCHING", "badge-dfs");
+      setAgentBadge("greedy", "SEARCHING", "badge-greedy");
+
+      // Highlight start and target nodes on graph
+      if (network) {
+        network.selectNodes([start, target]);
+      }
+
+      try {
+        /*
+         * POST to Flask /api/search
+         * Body: { start, target }
+         * Response: full agent results + blackboard log
+         */
+        const res    = await fetch(`${API}/api/search`, {
+          method  : "POST",
+          headers : { "Content-Type": "application/json" },
+          body    : JSON.stringify({ start, target })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          errEl.textContent = data.error || "Server error. Check Flask console.";
+          errEl.classList.remove("d-none");
+          return;
+        }
+
+        renderResults(data);
+
+      } catch (err) {
+        errEl.textContent = "Network error — is the Flask server running?";
+        errEl.classList.remove("d-none");
+        console.error(err);
+      } finally {
+        document.getElementById("btn-run").disabled = false;
+        document.getElementById("spinner").classList.remove("active");
+      }
+    }
+
+    // ── 6. RENDER ALL RESULTS ────────────────────────────────────
+    function renderResults(data) {
+      const summary = data.summary;
+      const results = data.results;
+
+      // Update agent badges
+      results.forEach(r => {
+        const key   = r.strategy.toLowerCase();
+        const found = r.found;
+        setAgentBadge(
+          key,
+          found ? "FOUND" : "EXHAUSTED",
+          found ? "badge-found" : "badge-idle"
+        );
+      });
+
+      // ── Comparison Table ──
+      const tbody = document.getElementById("compare-body");
+      tbody.innerHTML = "";
+      const rankClasses = ["rank-1","rank-2","rank-3"];
+
+      summary.agents.forEach((row, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = rankClasses[idx] || "";
+        tr.innerHTML = `
+          <td>${idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}</td>
+          <td><strong>${row.agent}</strong></td>
+          <td>${row.strategy}</td>
+          <td>${row.found ? '<span class="badge bg-success">YES</span>' : '<span class="badge bg-danger">NO</span>'}</td>
+          <td>${row.hops}</td>
+          <td>${row.steps}</td>
+          <td>${row.msgs_sent}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Best agent banner
+      document.getElementById("best-agent-banner").innerHTML = `
+        <div class="alert alert-success py-1 mb-0" style="font-size:.78rem;">
+          🏆 <strong>Best Agent:</strong> ${summary.best_agent} &nbsp;|&nbsp;
+          Total blackboard messages: <strong>${summary.total_msgs}</strong>
+        </div>`;
+
+      // Path display
+      const pathsDiv = document.getElementById("paths-section");
+      pathsDiv.innerHTML = "<div class='section-heading'>DISCOVERED PATHS</div>";
+      results.forEach(r => {
+        if (r.found && r.path.length) {
+          pathsDiv.innerHTML += `
+            <div style="margin-bottom:.5rem;">
+              <span style="font-size:.72rem;font-weight:700;">${r.agent}</span>
+              <div class="path-strip">
+                ${r.path.map((n,i) => i < r.path.length-1 ? `${n}<span class='arrow'> → </span>` : n).join("")}
+              </div>
+            </div>`;
+        }
+      });
+
+      // Highlight found path on graph (use BFS path preferentially)
+      const bfsResult = results.find(r => r.strategy === "BFS" && r.found);
+      if (bfsResult && network && bfsResult.path.length > 1) {
+        highlightPath(bfsResult.path);
+      }
+
+      // Show compare section
+      document.getElementById("no-results"  ).classList.add("d-none");
+      document.getElementById("compare-wrap").classList.remove("d-none");
+
+      // ── Step-by-step tables ──
+      results.forEach(r => {
+        const key  = r.strategy.toLowerCase();
+        const wrap = document.getElementById(`${key}-steps-wrap`);
+        wrap.innerHTML = buildStepsTable(r.steps);
+      });
+
+      // ── Blackboard Message Log ──
+      const msgLog = document.getElementById("msg-log");
+      const msgs   = data.blackboard || [];
+      msgLog.innerHTML = msgs.slice(-80).map(m => {
+        const isFound = m.msg_type === "FOUND";
+        const cls     = isFound ? "ms-found" : "";
+        return `<div class="msg-row ${cls}">
+          [<span class="ms-sender">${m.sender}</span>]
+          <span class="ms-type">${m.msg_type}</span>
+          ${JSON.stringify(m.payload).substring(0, 80)}
+        </div>`;
+      }).join("") || "<span class='text-muted'>No messages</span>";
+
+      document.getElementById("msg-count-badge").textContent = `${msgs.length} msgs`;
+      msgLog.scrollTop = msgLog.scrollHeight;  // Auto-scroll to latest
+    }
+
+    // ── 7. BUILD STEPS TABLE HTML ─────────────────────────────────
+    function buildStepsTable(steps) {
+      if (!steps || steps.length === 0) {
+        return `<div class="text-muted text-center py-3" style="font-size:.78rem;">No steps recorded</div>`;
+      }
+      const rows = steps.map((s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td class="action-${s.action}">${s.action}</td>
+          <td>${s.node}</td>
+          <td style="white-space:normal;font-size:.65rem;color:#6c757d;">${s.detail || ""}</td>
+        </tr>`).join("");
+
+      return `
+        <table class="table table-sm steps-table mb-0">
+          <thead><tr><th>#</th><th>ACTION</th><th>NODE</th><th>DETAIL</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    // ── 8. AGENT BADGE HELPER ─────────────────────────────────────
+    function setAgentBadge(key, label, cssClass) {
+      const el = document.getElementById(`badge-${key}`);
+      if (!el) return;
+      const icon = label === "FOUND" ? "bi-check-circle-fill" :
+                   label === "SEARCHING" ? "bi-arrow-repeat" :
+                   label === "EXHAUSTED" ? "bi-x-circle-fill" : "bi-circle";
+      el.className   = `agent-badge ${cssClass}`;
+      el.innerHTML   = `<i class="bi ${icon}"></i> ${
+        key === "bfs" ? "BFS" : key === "dfs" ? "DFS" : "Greedy"}-Agent · ${label}`;
+    }
+
+    // ── 9. PATH HIGHLIGHT ON VIS.JS GRAPH ────────────────────────
+    function highlightPath(path) {
+      /*
+       * Draw the found path by selecting the path nodes in vis.js.
+       * vis.js will highlight edges between selected nodes automatically.
+       */
+      if (!network) return;
+      network.selectNodes(path, true);   // true = highlight connected edges
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", () => {
+      loadStudentProfile();
+      initGraph();
+      loadNodeDropdowns();
+    });
+
+    // Allow Enter key to trigger search
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter") runSearch();
+    });
+  </script>
+
+</body>
+</html>
